@@ -1,6 +1,7 @@
 from underground.context import Context
 import json
 import discord
+import asyncio
 
 class DictObject:
     def __init__(self, dictionary):
@@ -104,40 +105,33 @@ class UserClient:
                 message = await gateway.receive()
             except Exception as e:
                 print("Resuming connection...")
-                await gateway.connect(gateway.uri)
-                await gateway.send(json.dumps({
-                    "op": 6,
-                    "d":{
-                        "token": client.token,
-                        "session_id": client.session,
-                        "seq": gateway.sequence
-                    }
-                }))
+                await gateway.connect()
+                await gateway.send(identify)
                 continue
 
             try:
-                event = json.loads(message)
-                gateway.sequence = event.get("s", gateway.sequence)
-
-                if event.get("t") == "READY":
-                    with open("ready.json", "w") as f:
-                        f.write(json.dumps(event, indent=4))
-
-                    client.user = JSON.parse(event["d"]["user"])
-                    client.session = event["d"]["session_id"]
-
-                    print("Logged into ", client.user.username, "#", client.user.discriminator, "\nSession ID: ", client.session, sep="")
-
-                    continue
-                
-                if event["op"] == 0:
-                    await client.event_handler(event)
-                    continue
-
-                if event["op"] == 10:
-                    if event["d"].get("heartbeat_interval"):
-                        gateway.ping_interval = event["d"]["heartbeat_interval"]
-
-            except Exception as e:
-                print(e)
+                asyncio.create_task(client.handle_message(message, gateway, client))
+            except:
                 continue
+
+    async def handle_message(self, message, gateway, client):
+        event = json.loads(message)
+        gateway.sequence = event.get("s", gateway.sequence)
+
+        if event.get("t") == "READY":
+            with open("ready.json", "w") as f:
+                f.write(json.dumps(event, indent=4))
+
+            client.user = JSON.parse(event["d"]["user"])
+            client.session = event["d"]["session_id"]
+
+            print("Logged into ", client.user.username, "#", client.user.discriminator, "\nSession ID: ", client.session, sep="")
+            return
+        
+        if event["op"] == 0:
+            await client.event_handler(event)
+            return
+
+        if event["op"] == 10:
+            if event["d"].get("heartbeat_interval"):
+                gateway.ping_interval = event["d"]["heartbeat_interval"]
