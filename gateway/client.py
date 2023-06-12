@@ -1,4 +1,5 @@
 from underground.context import Context
+from underground.gateway.ws import GatewayClient
 import json
 import discord
 import asyncio
@@ -22,13 +23,13 @@ class JSON:
         return DictObject(json)
 
 class UserClient:
-    def __init__(self, token):
+    def __init__(self, token, prefix="!"):
         self.token = token
         self.session = None
         self.user_cache = []
         self.guild_cache = []
         self.commands = {}
-        self.prefix = "!"
+        self.prefix = prefix
 
     def command(self, name):
         def decorator(func):
@@ -135,3 +136,15 @@ class UserClient:
         if event["op"] == 10:
             if event["d"].get("heartbeat_interval"):
                 gateway.ping_interval = event["d"]["heartbeat_interval"]
+
+    async def main(self, client):
+        gateway = GatewayClient("wss://underground.haydar.dev/?encoding=json&v=9")
+        await gateway.connect()
+
+        task1 = asyncio.create_task(client.recieve_events(gateway, client))
+        task2 = asyncio.create_task(gateway.start_ping())
+
+        await asyncio.gather(task1, task2)
+
+    def run(self):
+        asyncio.run(self.main(self))
